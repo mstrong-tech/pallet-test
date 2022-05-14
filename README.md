@@ -26,7 +26,7 @@ First, complete the [basic Rust setup instructions](./docs/rust-setup.md).
 Use Rust's native `cargo` command to build and launch the template node:
 
 ```sh
-cargo run --release -- --dev --tmp
+cargo run --release -- --dev
 ```
 
 ### Build
@@ -74,16 +74,16 @@ RUST_BACKTRACE=1 ./target/release/node-template -ldebug --dev
 ```
 
 > Development chain means that the state of our chain will be in a tmp folder while the nodes are
->   running. Also, **alice** account will be authority and sudo account as declared in the [genesis
-> state](https://github.com/substrate-developer-hub/substrate-node-template/blob/main/node/src/
-chain_spec.rs#L49). At the same time the following accounts will be prefunded:
+> running. Also, **alice** account will be authority and sudo account as declared in the
+> [genesis state](https://github.com/substrate-developer-hub/substrate-node-template/blob/main/node/src/chain_spec.rs#L49).
+> At the same time the following accounts will be pre-funded:
 > - Alice
-> - Bob 
+> - Bob
 > - Alice//stash
 > - Bob//stash
 
 In case of being interested in maintaining the chain' state between runs a base path must be added
-so the db can be stored in the provided folder instead of a temporal one. We could use this folder 
+so the db can be stored in the provided folder instead of a temporal one. We could use this folder
 to store different chain databases, as a different folder will be created per different chain that
 is ran. The following commands shows how to use a newly created folder as our db base path.
 
@@ -193,7 +193,7 @@ The runtime in this project is constructed using many FRAME pallets that ship wi
 [core Substrate repository](https://github.com/paritytech/substrate/tree/master/frame) and a
 template pallet that is [defined in the `pallets`](./pallets/template/src/lib.rs) directory.
 
-A FRAME pallet is compromised of a number of blockchain primitives:
+A FRAME pallet is comprised of a number of blockchain primitives:
 
 - Storage: FRAME defines a rich set of powerful
   [storage abstractions](https://docs.substrate.io/v3/runtime/storage) that makes

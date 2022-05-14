@@ -1,102 +1,119 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/v3/runtime/frame>
+
 pub use pallet::*;
 
-#[cfg(test)]
-mod mock;
+/// 1.  Have a sudo account
+///
+/// 2. Have a storage with bounded vector
+///
+/// 3. Configure maximum no of members
+///
+/// 4. Only sudo account can add and remove members
+///
 
-#[cfg(test)]
-mod tests;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use frame_support::{
+		dispatch::DispatchResult,
+		pallet_prelude::*,
+		storage::bounded_vec::BoundedVec,
+
+	};
+
 	use frame_system::pallet_prelude::*;
+
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+		/// Maximum number of members
+		#[pallet::constant]
+		type MaxMembers: Get<u32>;
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
+	#[pallet::generate_store(pub (super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/v3/runtime/storage
-	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/v3/runtime/events-and-errors
+	#[pallet::storage]
+	#[pallet::getter(fn get_members)]
+	pub type Members<T:Config> = StorageValue<_, BoundedVec<T::AccountId, T::MaxMembers>,ValueQuery>;
+
+
 	#[pallet::event]
-	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	#[pallet::generate_deposit(pub (super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		//Time and AccountId for new member added event
+		NewMemberAdded(T::BlockNumber, T::AccountId),
+		// Time and AccountId for member removed
+		MemberRemoved(T::BlockNumber, T::AccountId),
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		NotAuthorized,
+		RootCannotBeMember,
+		MembersLimitExceeded,
+		MemberNotFound,
+
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
+
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/v3/runtime/origins
-			let who = ensure_signed(origin)?;
+		#[pallet::weight(0)]
+		pub fn add_member(
+			origin:OriginFor<T>,
+			member: T::AccountId,
 
-			// Update storage.
-			<Something<T>>::put(something);
+		) -> DispatchResult {
 
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
+			ensure_signed(origin)?;
+
+
+			//updating the storage
+			<Members<T>>::try_mutate(|mem_vec| {
+				mem_vec.try_push(member.clone())
+			}).map_err(|_| <Error<T>>::MembersLimitExceeded)?;
+
+			let time = <frame_system::Pallet<T>>::block_number();
+
+			Self::deposit_event(Event::NewMemberAdded(time, member.clone()));
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+		#[pallet::weight(0)]
+		pub fn remove_member(
+			origin:OriginFor<T>,
+			member: T::AccountId,
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue)?,
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+		) -> DispatchResult {
+			ensure_signed(origin)?;
+			// changing the storage
+			<Members<T>>::try_mutate(|mem_vec|{
+				if let Some(index) = mem_vec.iter().position(|mem| *mem == member.clone()){
+					mem_vec.remove(index);
+					return Ok(());
+				}
+				Err(())
+			}).map_err(|_| <Error<T>>::MemberNotFound)?;
+
+
+			let time = <frame_system::Pallet<T>>::block_number();
+
+			Self::deposit_event(Event::MemberRemoved(time,member.clone()));
+
+			Ok(())
 		}
 	}
-}
+
+  }
+
+
